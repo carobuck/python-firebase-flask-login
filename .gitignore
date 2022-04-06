@@ -1,0 +1,8 @@
+config.py
+apikey.json
+fbAdminConfig.json
+
+__pycache__/
+# these might be trash files to throw out anyways?
+config-jic.py
+fbconfig.json

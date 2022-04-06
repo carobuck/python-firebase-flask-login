@@ -1,0 +1,2 @@
+curl -H 'Content-Type: application/json' -X POST -d '{"email":"cbuck7@gmail.com","password":"caroline"}' http://127.0.0.1:5000/signin
+curl -H 'Content-Type: application/json' -X POST -d '{"email":"cbuck7@gmail.com","password":"caroline"}' http://127.0.0.1:5000/signup

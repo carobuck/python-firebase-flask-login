@@ -1,118 +1,75 @@
-################################################################################
-################################################################################
-########                                                                ########
-########   Python - Firebase - Flask Login/Register App                 ########
-########   Author: Hemkesh Agrawal                                      ########
-########   Website: http://hemkesh.com                                  ########
-########   Last updated on: 11/27/2019                                  ########
-########                                                                ########
-########   P.S. This is my first ever github project, so I              ########
-########   would love to hear your feedback : agrawalh@msu.edu          ########
-########                                                                ########
-################################################################################
-################################################################################
-
+# source: https://makedeveasy.medium.com/authenitcation-using-python-flask-and-firestore-1958d29e2240
+import os
+from flask import Flask, request, jsonify
+from firebase_admin import credentials, firestore, initialize_app
+import firebase_admin
 import pyrebase
-from flask import Flask, flash, redirect, render_template, request, session, abort, url_for
+from flask_cors import CORS
+import io
+import json
 
-app = Flask(__name__)       #Initialze flask constructor
+from firebase_admin import auth
 
-#Add your own details
-config = {
-  "apiKey": "PASTE_HERE",
-  "authDomain": "PASTE_HERE",
-  "databaseURL": "PASTE_HERE",
-  "storageBucket": "PASTE_HERE"
-}
+# TODO make config work in this file. config.keys
+import config
+#config.keys
+app=Flask(__name__)
+CORS(app)
 
-#initialize firebase
+
 firebase = pyrebase.initialize_app(config)
 auth = firebase.auth()
 db = firebase.database()
 
-#Initialze person as dictionary
-person = {"is_logged_in": False, "name": "", "email": "", "uid": ""}
+@app.route("/")  #basic api
+def home():
+    return "hello all"
 
-#Login
-@app.route("/")
-def login():
-    return render_template("login.html")
-
-#Sign up/ Register
-@app.route("/signup")
+@app.route('/signup',methods=['POST'])   #signup api
 def signup():
-    return render_template("signup.html")
-
-#Welcome page
-@app.route("/welcome")
-def welcome():
-    if person["is_logged_in"] == True:
-        return render_template("welcome.html", email = person["email"], name = person["name"])
-    else:
-        return redirect(url_for('login'))
-
-#If someone clicks on login, they are redirected to /result
-@app.route("/result", methods = ["POST", "GET"])
-def result():
-    if request.method == "POST":        #Only if data has been posted
-        result = request.form           #Get the data
-        email = result["email"]
-        password = result["pass"]
-        try:
-            #Try signing in the user with the given information
-            user = auth.sign_in_with_email_and_password(email, password)
-            #Insert the user data in the global person
-            global person
-            person["is_logged_in"] = True
-            person["email"] = user["email"]
-            person["uid"] = user["localId"]
-            #Get the name of the user
-            data = db.child("users").get()
-            person["name"] = data.val()[person["uid"]]["name"]
-            #Redirect to welcome page
-            return redirect(url_for('welcome'))
-        except:
-            #If there is any error, redirect back to login
-            return redirect(url_for('login'))
-    else:
-        if person["is_logged_in"] == True:
-            return redirect(url_for('welcome'))
+    email=request.json['email']   #get the email from json
+    password=request.json['password'] #get the password from json
+    if email is None or password is None:
+       return jsonify({'message':'username and password must not in blank'}),400
+    try:
+        user = auth.create_user_with_email_and_password(email,password)
+        user = auth.sign_in_with_email_and_password(email, password)
+        #pb.auth().send_email_verification(user['idToken']) # ADD if want email verification?
+        return jsonify({'message': f'Successfully created user'}),200
+    except:
+        if email:
+            # TODO: this causes bugs.
+            emailexists=auth.get_user_by_email(email)
+            if(emailexists.uid):
+                return jsonify({'message': 'user is already exists '}),400
         else:
-            return redirect(url_for('login'))
+            return jsonify({'message': 'error creating in user'}),400
 
-#If someone clicks on register, they are redirected to /register
-@app.route("/register", methods = ["POST", "GET"])
-def register():
-    if request.method == "POST":        #Only listen to POST
-        result = request.form           #Get the data submitted
-        email = result["email"]
-        password = result["pass"]
-        name = result["name"]
-        try:
-            #Try creating the user account using the provided data
-            auth.create_user_with_email_and_password(email, password)
-            #Login the user
-            user = auth.sign_in_with_email_and_password(email, password)
-            #Add data to global person
-            global person
-            person["is_logged_in"] = True
-            person["email"] = user["email"]
-            person["uid"] = user["localId"]
-            person["name"] = name
-            #Append data to the firebase realtime database
-            data = {"name": name, "email": email}
-            db.child("users").child(person["uid"]).set(data)
-            #Go to welcome page
-            return redirect(url_for('welcome'))
-        except:
-            #If there is any error, redirect to register
-            return redirect(url_for('register'))
+@app.route('/signin',methods=['POST'])  #signin api
+def signin():
+    email=request.json['email']
+    password=request.json['password']
+    if email is None or password is None:
+        return jsonify({'message':'username and password must not to be empty'})
+    try:
+        user = auth.sign_in_with_email_and_password(email, password)
+        print(user)
+        # TODO: what the heck is this stuff??
+        arr=''
 
-    else:
-        if person["is_logged_in"] == True:
-            return redirect(url_for('welcome'))
+        for x in user:
+            if x == 'localId':
+                arr=(user[x])
+
+        user1= auth.get_user(arr)
+        user3=user1.email_verified
+        print(user3)
+        if user3:
+            return user
         else:
-            return redirect(url_for('register'))
+            return jsonify({'message':'please verify your account with your mailId'}),400
+    except:
+        return jsonify({'message':'invalid crendentails please enter with valid credentials'}),400
 
 if __name__ == "__main__":
     app.run()
